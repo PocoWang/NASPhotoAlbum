@@ -139,6 +139,9 @@ final class SettingsViewController: UITableViewController {
 
     private var sections: [Section] = []
 
+    /// 最后点击的 cell（iPad 上 actionSheet 弹窗必须锚定 popover 来源，否则直接闪退）
+    private weak var lastTappedCell: UITableViewCell?
+
     // MARK: - 生命周期
 
     init() { super.init(style: .grouped) }
@@ -152,6 +155,15 @@ final class SettingsViewController: UITableViewController {
         tableView.separatorColor = UIColor(white: 1.0, alpha: 0.08)
         tableView.rowHeight = 52
         rebuildSections()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 首页隐藏了导航栏（setNavigationBarHidden 对整个栈生效），
+        // 进入设置必须恢复显示，否则二级页没有返回/保存按钮
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+        navigationController?.navigationBar.barStyle = .black
+        navigationController?.isToolbarHidden = true
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -433,6 +445,7 @@ final class SettingsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: false)
+        lastTappedCell = tableView.cellForRow(at: indexPath)
         let row = sections[indexPath.section].rows[indexPath.row]
         switch row {
         case .text(let label, let placeholder, let secure, let keyboard, let key):
@@ -509,6 +522,19 @@ final class SettingsViewController: UITableViewController {
             })
         }
         alert.addAction(UIAlertAction(title: "取消", style: .cancel, handler: nil))
+        // iPad 上 actionSheet 以 popover 形式呈现，必须提供锚点（sourceView+sourceRect），
+        // 否则抛出 NSGenericException 直接闪退；iPhone 上设置锚点无副作用
+        if let pop = alert.popoverPresentationController {
+            if let cell = lastTappedCell {
+                pop.sourceView = cell
+                pop.sourceRect = cell.bounds
+            } else {
+                pop.sourceView = tableView
+                pop.sourceRect = CGRect(
+                    x: tableView.bounds.midX, y: tableView.bounds.midY, width: 0, height: 0
+                )
+            }
+        }
         present(alert, animated: true, completion: nil)
     }
 

@@ -56,6 +56,9 @@ final class MainViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // 首页始终隐藏导航栏（从设置/幻灯片返回时栈上状态可能是"显示"，需重新隐藏）
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+        navigationController?.isToolbarHidden = true
         refreshStats()
     }
 

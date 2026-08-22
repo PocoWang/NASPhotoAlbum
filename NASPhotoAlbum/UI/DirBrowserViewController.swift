@@ -397,6 +397,10 @@ final class DirBrowserViewController: UITableViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // 首页隐藏了导航栏，本页的"保存/上一级"按钮都在导航栏上，必须恢复显示
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+        navigationController?.navigationBar.barStyle = .black
+        navigationController?.isToolbarHidden = false
         if longPressGesture.view == nil {
             tableView.addGestureRecognizer(longPressGesture)
         }
