@@ -118,6 +118,10 @@ final class ScanCoordinator {
     /// App 启动/回前台时调用：先做一次到期检查，然后每 30 分钟复查
     func maybeAutoScan() {
         checkScanDue()
+        // 缓存未满则继续补下载：App 退出后下载循环已终止，重启必须显式续传。
+        // 与 checkScanDue 可能触发的扫描共用串行队列：扫描任务排在前，
+        // 其内部下载循环填满缓存后，本下载会因 canDownloadMore==false 立即退出，无冲突。
+        downloadNow()
         startAutoScanLoop()
     }
 
