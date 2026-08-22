@@ -316,22 +316,23 @@ final class Database {
         defer { sqlite3_finalize(stmt) }
         if let bind = bind { bind(stmt) }
         while sqlite3_step(stmt) == SQLITE_ROW {
-            let fullPath = columnText(stmt, 1)
-            let shareName = columnText(stmt, 2)
-            let fileName = columnText(stmt, 3)
-            let parentPath = columnText(stmt, 4)
-            let sizeBytes = sqlite3_column_int64(stmt, 5)
-            let lastModified = sqlite3_column_int64(stmt, 6)
-            let fileExtension = columnText(stmt, 7)
-            let indexedAt = sqlite3_column_int64(stmt, 8)
-            let isCached = sqlite3_column_int(stmt, 9) != 0
-            let localCachePath: String? = sqlite3_column_type(stmt, 10) == SQLITE_NULL
-                ? nil : columnText(stmt, 10)
-            let lastPlayedAt = sqlite3_column_int64(stmt, 11)
-            let isLivePhoto = sqlite3_column_int(stmt, 12) != 0
-            let pairedVideoPath: String? = sqlite3_column_type(stmt, 13) == SQLITE_NULL
-                ? nil : columnText(stmt, 13)
-            let videoSizeBytes = sqlite3_column_int64(stmt, 14)
+            // 注意：SQLite 列索引是 0 起始（bind 参数才是 1 起始），SELECT * 共 14 列（0~13）
+            let fullPath = columnText(stmt, 0)
+            let shareName = columnText(stmt, 1)
+            let fileName = columnText(stmt, 2)
+            let parentPath = columnText(stmt, 3)
+            let sizeBytes = sqlite3_column_int64(stmt, 4)
+            let lastModified = sqlite3_column_int64(stmt, 5)
+            let fileExtension = columnText(stmt, 6)
+            let indexedAt = sqlite3_column_int64(stmt, 7)
+            let isCached = sqlite3_column_int(stmt, 8) != 0
+            let localCachePath: String? = sqlite3_column_type(stmt, 9) == SQLITE_NULL
+                ? nil : columnText(stmt, 9)
+            let lastPlayedAt = sqlite3_column_int64(stmt, 10)
+            let isLivePhoto = sqlite3_column_int(stmt, 11) != 0
+            let pairedVideoPath: String? = sqlite3_column_type(stmt, 12) == SQLITE_NULL
+                ? nil : columnText(stmt, 12)
+            let videoSizeBytes = sqlite3_column_int64(stmt, 13)
             result.append(PhotoIndexEntity(
                 fullPath: fullPath,
                 shareName: shareName,
