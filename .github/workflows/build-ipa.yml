@@ -1,0 +1,65 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show tool versions
+        run: |
+          xcodebuild -version
+          pod --version
+
+      # 兼容两种上传方式：仓库根=项目根，或仓库根含 iOS/NASPhotoAlbum 子目录
+      - name: Locate project
+        run: |
+          if [ -f Podfile ]; then
+            echo "PROJECT_DIR=." >> $GITHUB_ENV
+          elif [ -f iOS/NASPhotoAlbum/Podfile ]; then
+            echo "PROJECT_DIR=iOS/NASPhotoAlbum" >> $GITHUB_ENV
+          else
+            echo "::error::未找到 Podfile，请确认仓库根目录结构"
+            exit 1
+          fi
+          echo "项目目录: $PROJECT_DIR"
+
+      - name: CocoaPods install (AMSMB2 2.7.1)
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: pod install
+
+      - name: Build archive (unsigned)
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -workspace NASPhotoAlbum.xcworkspace \
+            -scheme NASPhotoAlbum \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/NASPhotoAlbum.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
+
+      - name: Package unsigned IPA
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          mkdir -p build/Payload
+          cp -R "build/NASPhotoAlbum.xcarchive/Products/Applications/NASPhotoAlbum.app" build/Payload/
+          cd build
+          zip -qry NASPhotoAlbum-unsigned.ipa Payload
+          ls -lh NASPhotoAlbum-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NASPhotoAlbum-unsigned-ipa
+          path: **/build/NASPhotoAlbum-unsigned.ipa
+          retention-days: 90
+          if-no-files-found: error
