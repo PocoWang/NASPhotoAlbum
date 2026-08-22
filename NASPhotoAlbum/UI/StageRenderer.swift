@@ -195,6 +195,9 @@ final class StageRenderer {
             lastConsumedCount = min(isPortraitStage ? 2 : 3, 1 + upcomingFiles.count)
         case .mosaic:
             lastConsumedCount = min(isPortraitStage ? 6 : 9, 1 + upcomingFiles.count)
+        case .polaroid:
+            // 横屏最多铺开 3 张（当前张+后续两张），竖屏单张
+            lastConsumedCount = isPortraitStage ? 1 : min(3, 1 + upcomingFiles.count)
         default: lastConsumedCount = 1
         }
 
@@ -212,7 +215,9 @@ final class StageRenderer {
                 ? buildLivePhoto(stage: stage, current: current, videoFile: liveVideo!, photoTimeMs: photoTimeMs)
                 : buildKenBurns(stage: stage, current: current, intervalMs: intervalMs, photoTimeMs: photoTimeMs)
         case .polaroid:
-            buildPolaroid(stage: stage, current: current, caption: caption)
+            buildPolaroid(
+                stage: stage, current: current, caption: caption, upcoming: uniqueUpcoming
+            )
             hasAnimation = false
         case .collage:
             buildCollage(stage: stage, current: current, upcoming: upcomingFiles)
@@ -504,12 +509,64 @@ final class StageRenderer {
 
     // MARK: - 拍立得卡片
 
-    /// 宽白边卡片 + 确定性随机倾斜 + 手写体日期 + 掉落弹跳入场
-    private func buildPolaroid(stage: UIView, current: URL, caption: String?) {
+    /**
+     * 拍立得卡片模式：
+     * 竖屏 = 单张宽白边卡片铺满舞台（掉落弹跳入场）；
+     * 横屏 = 最多 3 张扇形铺开（当前张居中置顶，左右各一张后续照片），
+     * 适配 iPad mini 2 横屏相框场景，画面更饱满。
+     */
+    private func buildPolaroid(
+        stage: UIView, current: URL, caption: String?, upcoming: [UpcomingPhoto]
+    ) {
+        // 竖屏或无后续照片：维持单张铺满
+        if isPortraitStage || upcoming.isEmpty {
+            makePolaroidCard(
+                stage: stage, photoFile: current, caption: caption,
+                frame: stage.bounds.insetBy(dx: 48, dy: 48),
+                flexible: true, entranceDelay: 0
+            )
+            return
+        }
+
+        // 横屏：扇形铺开（轻微交叠），中间卡压最上层且位置略高
+        let tail: [(file: URL, caption: String?)] = upcoming.prefix(2).map {
+            (file: $0.file, caption: Self.polaroidCaptionText(timeMs: $0.timeMs) as String?)
+        }
+        let photos: [(file: URL, caption: String?)] = [(file: current, caption: caption)] + tail
+        let count = photos.count // 2 或 3
         let b = stage.bounds
-        let outer: CGFloat = 48
-        let card = UIView(frame: b.insetBy(dx: outer, dy: outer))
-        card.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        let cardW = min(b.height * 0.44, 330)
+        let cardH = cardW * 1.28
+        // 相邻卡片圆心距（小于卡宽形成交叠扇形；两端留白 >= 40pt）
+        let spread = count == 3
+            ? min(cardW * 0.82, (b.width - cardW - 80) / 2)
+            : cardW * 0.66
+        for (i, p) in photos.enumerated() {
+            let isCenter = (count == 3 && i == 1)
+            let offset = CGFloat(i) - CGFloat(count - 1) / 2 // 3 张: -1/0/+1；2 张: -0.5/+0.5
+            let card = makePolaroidCard(
+                stage: stage, photoFile: p.file, caption: p.caption,
+                frame: CGRect(x: 0, y: 0, width: cardW, height: cardH),
+                flexible: false, entranceDelay: 0.12 * Double(i)
+            )
+            card.center = CGPoint(x: b.midX + offset * spread, y: b.midY + (isCenter ? -6 : 10))
+            card.layer.zPosition = isCenter ? 2 : 1
+        }
+    }
+
+    /**
+     * 创建一张拍立得卡片并加入舞台：宽白边 + 内嵌照片 + 手写体日期，
+     * 确定性随机倾斜（同一张照片永远同一角度）+ 掉落弹跳入场。
+     */
+    @discardableResult
+    private func makePolaroidCard(
+        stage: UIView, photoFile: URL, caption: String?,
+        frame: CGRect, flexible: Bool, entranceDelay: TimeInterval
+    ) -> UIView {
+        let card = UIView(frame: frame)
+        if flexible {
+            card.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        }
         card.backgroundColor = .white
         card.layer.cornerRadius = 4
         card.layer.shadowColor = UIColor.black.cgColor
@@ -523,8 +580,8 @@ final class StageRenderer {
         let captionH: CGFloat = 58
         let photoFrame = CGRect(
             x: pad, y: pad,
-            width: card.bounds.width - pad * 2,
-            height: card.bounds.height - pad - captionH
+            width: frame.width - pad * 2,
+            height: frame.height - pad - captionH
         )
         let iv = UIImageView(frame: photoFrame)
         iv.contentMode = .scaleAspectFill
@@ -532,12 +589,12 @@ final class StageRenderer {
         iv.layer.cornerRadius = 2
         iv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         card.addSubview(iv)
-        loadInto(iv, file: current)
+        loadInto(iv, file: photoFile)
 
         // 手写风日期
         let captionView = UILabel(frame: CGRect(
             x: pad, y: photoFrame.maxY,
-            width: card.bounds.width - pad * 2, height: captionH
+            width: frame.width - pad * 2, height: captionH
         ))
         captionView.autoresizingMask = [.flexibleWidth, .flexibleTopMargin]
         captionView.text = caption ?? ""
@@ -548,7 +605,7 @@ final class StageRenderer {
         card.addSubview(captionView)
 
         // 确定性旋转（-4° ~ 4°）：同一张照片始终同一角度
-        let seed = stableHash(current.lastPathComponent)
+        let seed = stableHash(photoFile.lastPathComponent)
         let rotation = (-4 + CGFloat(seed % 9) * 0.88) * .pi / 180
         card.transform = CGAffineTransform(rotationAngle: rotation)
 
@@ -559,13 +616,28 @@ final class StageRenderer {
             .translatedBy(x: 0, y: -200)
             .scaledBy(x: 0.85, y: 0.85)
         pendingAnimations.append {
-            UIView.animate(withDuration: 0.6, delay: 0,
+            UIView.animate(withDuration: 0.6, delay: entranceDelay,
                            usingSpringWithDamping: 0.55, initialSpringVelocity: 0.6,
                            options: [.curveEaseOut]) {
                 card.alpha = 1
                 card.transform = finalTransform
             }
         }
+        return card
+    }
+
+    /// 拍立得手写体日期文字（格式与 SlideshowViewController 的 caption 一致："yyyy年M月d日"）
+    private static let polaroidCaptionFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "yyyy年M月d日"
+        return f
+    }()
+
+    private static func polaroidCaptionText(timeMs: Int64) -> String {
+        return polaroidCaptionFormatter.string(
+            from: Date(timeIntervalSince1970: TimeInterval(timeMs) / 1000.0)
+        )
     }
 
     // MARK: - 回忆拼贴
