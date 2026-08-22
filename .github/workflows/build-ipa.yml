@@ -58,7 +58,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
+            DEVELOPMENT_TEAM="" 2>&1 | tee build.log
+
+      # 编译失败时自动提取 error 行，不用在日志里翻找
+      - name: Show errors on failure
+        if: failure()
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          echo "===== 编译错误汇总 ====="
+          grep -B2 "error:" build.log || echo "（未找到 error 行，失败原因在上方日志中）"
 
       - name: Package unsigned IPA
         working-directory: ${{ env.PROJECT_DIR }}
