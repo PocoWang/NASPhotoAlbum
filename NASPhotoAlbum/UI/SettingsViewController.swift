@@ -76,7 +76,7 @@ final class TimeRangePickerViewController: UIViewController {
         endPicker.date = TimeRangePickerViewController.date(fromMinute: endMinute)
         endPicker.setValue(UIColor.white, forKey: "textColor")
 
-        for v in [startLabel, startPicker, endLabel, endPicker] { view.addSubview(v) }
+        for v in [startLabel, startPicker, endLabel, endPicker] as [UIView] { view.addSubview(v) }
     }
 
     override func viewDidLayoutSubviews() {

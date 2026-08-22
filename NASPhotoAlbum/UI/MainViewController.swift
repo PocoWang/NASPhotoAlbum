@@ -131,7 +131,6 @@ final class MainViewController: UIViewController {
         nasStateLabel.textColor = UIColor(argb: 0xFF8BC34A)
         statusCard.addSubview(nasStateLabel)
 
-        statRow.spacing = 12
         statusCard.addSubview(statRow)
         statRow.addSubview(buildStatBlock(title: "照片总数", tag: 100))
         statRow.addSubview(buildStatBlock(title: "已缓存", tag: 101))
