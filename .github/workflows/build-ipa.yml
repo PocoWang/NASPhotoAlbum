@@ -1,3 +1,16 @@
+# 云编译工作流：在 GitHub 免费的 macOS 服务器上编译出未签名 .ipa
+# （Windows 无 Xcode，无法本地编译 iOS 应用；此方案无需 Mac）
+#
+# 使用方法：
+#   1. 把本文件夹（NASPhotoAlbum）的全部内容上传到 GitHub 仓库
+#   2. 仓库页面 → Actions 标签 → 首次进入点 "I understand my workflows, go ahead and enable them"
+#   3. 左侧选 "Build iOS IPA" → Run workflow → Run
+#   4. 等待约 10 分钟，点击本次运行记录，页面底部 Artifacts 处下载 ipa
+#   5. 在 Windows 上用 Sideloadly / 爱思助手签名并安装到 iPad
+#
+# 注：macos-15 自带 Xcode 16.x（支持 iOS 12 部署目标）。
+#     若未来 runner 升级导致报部署目标错误，将 runs-on 改为 macos-14 即可。
+
 name: Build iOS IPA
 
 on:
@@ -60,6 +73,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: NASPhotoAlbum-unsigned-ipa
-          path: **/build/NASPhotoAlbum-unsigned.ipa
+          path: "**/build/NASPhotoAlbum-unsigned.ipa"
           retention-days: 90
           if-no-files-found: error
